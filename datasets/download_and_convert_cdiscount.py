@@ -21,6 +21,8 @@ import io
 
 
 _NCORE =  1
+_IMAGE_HEIGHT = 180
+_IMAGE_WIDTH = 180
 
 def _make_category_tables(dataset_dir):
     categories_path = os.path.join(dataset_dir, "category_names.csv")
@@ -76,20 +78,14 @@ def run(dataset_dir):
     for train_slit in train_splits_fn:
         shad = train_slit.split('/')[-1].split('.')[0]
         output_filename = os.path.join(dataset_dir,"tf_records/train_{}.tfrecord".format(shad))
-        with tf.Graph().as_default():
-            image = tf.placeholder(dtype=tf.uint8, shape=[180, 180, 3])
-            encoded_png = tf.image.encode_png(image)
-            with tf.Session('') as sess:
-                with tf.python_io.TFRecordWriter(output_filename) as tfrecord_writer:
-                    print("Processing {} of {} train splits".format(i, len(train_splits_fn)))
-                    data = bson.decode_file_iter(open(train_slit, 'rb'))
-                    for c, d in enumerate(data):
-                        category_id = d['category_id']
-                        class_id = cat2idx[category_id]
-                        for e, pic in enumerate(d['imgs']):
-                            picture = imread(io.BytesIO(pic['picture']))
-                            png_string = sess.run(encoded_png, feed_dict={image: picture})
-                            height = picture.shape[0]
-                            width = picture.shape[1]
-                            example = dataset_utils.image_to_tfexample(png_string, b'png', height, width, class_id)
-                            tfrecord_writer.write(example.SerializeToString())
+        with tf.python_io.TFRecordWriter(output_filename) as tfrecord_writer:
+            print("Processing {} of {} train splits".format(i, len(train_splits_fn)))
+            data = bson.decode_file_iter(open(train_slit, 'rb'))
+            for c, d in enumerate(data):
+                category_id = d['category_id']
+                class_id = cat2idx[category_id]
+                for e, pic in enumerate(d['imgs']):
+                    pic['picture']
+                    example = dataset_utils.image_to_tfexample(pic['picture'], b'png', _IMAGE_HEIGHT, _IMAGE_WIDTH, class_id)
+                    tfrecord_writer.write(example.SerializeToString())
+        i += 1
