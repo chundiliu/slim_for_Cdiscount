@@ -11,9 +11,9 @@ slim = tf.contrib.slim
 
 _FILE_PATTERN = 'cdiscount_%s.tfrecord'
 
-#TODO gonna flatten the all the data set across all the images for the same product
+#TODO gonna flatten the all the data set across all the images for the same product # 7069896 for train and 1768182 for test
 
-SPLITS_TO_SIZES = {'train': 6969896, 'validation': 1000000, 'test': 10000}
+SPLITS_TO_SIZES = {'train': 6969896, 'validation': 1000000, 'test': 1768182}
 
 _NUM_CLASSES = 5270
 
