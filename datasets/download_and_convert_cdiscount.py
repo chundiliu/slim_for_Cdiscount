@@ -19,10 +19,9 @@ import bson
 from skimage.data import imread   # or, whatever image library you prefer
 import io
 
-
-_NCORE =  1
 _IMAGE_HEIGHT = 180
 _IMAGE_WIDTH = 180
+_TFRECORD_DIC = 'tf_records_all'
 
 def _make_category_tables(dataset_dir):
     categories_path = os.path.join(dataset_dir, "category_names.csv")
@@ -42,23 +41,21 @@ def _make_category_tables(dataset_dir):
         idx2cat[category_idx] = category_id
     return cat2idx, idx2cat
 
-def process(q, iolock, tfrecord_writer, cat2idx, sess, image, encoded_png):
-    while True:
-        d = q.get()
-        if d is None:
-            break
-        # = d['_id']
-        category_id = d['category_id']
-        class_id = cat2idx[category_id]
-        for e, pic in enumerate(d['imgs']):
-            picture = imread(io.BytesIO(pic['picture']))
-            png_string = sess.run(encoded_png, feed_dict={image: picture})
-            height = picture.shape[0]
-            width = picture.shape[1]
-            pdb.set_trace()
-            example = dataset_utils.image_to_tfexample(png_string, b'none', height, width, class_id)
-            tfrecord_writer.write(example.SerializeToString())
-            # do something with the picture, etc
+def _convert_dataset(dataset_dir, output_filename, split_name, cat2idx, _image_count, is_testing = False):
+    with tf.python_io.TFRecordWriter(output_filename) as tfrecord_writer:
+        print("Processing {}".format(split_name))
+        data = bson.decode_file_iter(open(split_name, 'rb'))
+        for c, d in enumerate(data):
+            if is_testing:
+                class_id = -1
+            else:
+                category_id = d['category_id']
+                class_id = cat2idx[category_id]
+            for e, pic in enumerate(d['imgs']):
+                example = dataset_utils.image_to_tfexample(pic['picture'], b'png', _IMAGE_HEIGHT, _IMAGE_WIDTH,
+                                                           class_id)
+                tfrecord_writer.write(example.SerializeToString())
+                _image_count[0] += 1
 
 def run(dataset_dir):
     """Runs the download and conversion operation.
@@ -71,21 +68,27 @@ def run(dataset_dir):
 
     cat2idx, idx2cat = _make_category_tables(dataset_dir)
 
-    sys.stdout.write("Converting to tfrecords")
+    sys.stdout.write("Converting to tfrecords\n")
     sys.stdout.flush()
+    # Convert the training data
+    _image_count = [0] #Count how many images in this split, use list to do reference pass
     train_splits_fn = sorted(glob.glob(os.path.join(dataset_dir, "split_train/*.bson")))
-    i = 1
-    for train_slit in train_splits_fn:
-        shad = train_slit.split('/')[-1].split('.')[0]
-        output_filename = os.path.join(dataset_dir,"tf_records/train_{}.tfrecord".format(shad))
-        with tf.python_io.TFRecordWriter(output_filename) as tfrecord_writer:
-            print("Processing {} of {} train splits".format(i, len(train_splits_fn)))
-            data = bson.decode_file_iter(open(train_slit, 'rb'))
-            for c, d in enumerate(data):
-                category_id = d['category_id']
-                class_id = cat2idx[category_id]
-                for e, pic in enumerate(d['imgs']):
-                    pic['picture']
-                    example = dataset_utils.image_to_tfexample(pic['picture'], b'png', _IMAGE_HEIGHT, _IMAGE_WIDTH, class_id)
-                    tfrecord_writer.write(example.SerializeToString())
-        i += 1
+    for train_split in train_splits_fn:
+        shad = train_split.split('/')[-1].split('.')[0]
+        output_filename = os.path.join(dataset_dir,"{}/cdiscount_train_{}.tfrecord".format(_TFRECORD_DIC, shad))
+        _convert_dataset(dataset_dir, output_filename, train_split, cat2idx, _image_count)
+    print("{} images in train split are converted into tfrecords file!".format(_image_count[0]))
+    #Convert Validation Data
+    _image_count = [0]  # Count how many images in this split, use list to do reference pass
+    valid_split = os.path.join(dataset_dir, "valid_split.bson")
+    output_filename = os.path.join(dataset_dir,"{}/cdiscount_valid.tfrecord".format(_TFRECORD_DIC))
+    _convert_dataset(dataset_dir, output_filename, valid_split, cat2idx, _image_count)
+    print("{} images in valid split are converted into tfrecords file!".format(_image_count[0]))
+    #Convert Testing Data
+    _image_count = [0]  # Count how many images in this split, use list to do reference pass
+    test_split = os.path.join(dataset_dir, "test.bson")
+    output_filename = os.path.join(dataset_dir, "{}/cdiscount_test.tfrecord".format(_TFRECORD_DIC))
+    _convert_dataset(dataset_dir, output_filename, test_split, cat2idx, _image_count, is_testing = True)
+    print("{} images in test split are converted into tfrecords file!".format(_image_count[0]))
+
+    print('\nFinished converting the Cdiscount dataset!')
