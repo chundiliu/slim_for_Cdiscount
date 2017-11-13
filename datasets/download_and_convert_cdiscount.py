@@ -11,8 +11,16 @@ import numpy as np # linear algebra
 import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 
 from datasets import dataset_utils
+import sys
+import pdb
+import glob
+import multiprocessing as mp      # will come in handy due to the size of the data
+import bson
+from skimage.data import imread   # or, whatever image library you prefer
+import io
 
-_NCORE =  20
+
+_NCORE =  1
 
 def _make_category_tables(dataset_dir):
     categories_path = os.path.join(dataset_dir, "category_names.csv")
@@ -32,16 +40,22 @@ def _make_category_tables(dataset_dir):
         idx2cat[category_idx] = category_id
     return cat2idx, idx2cat
 
-def process(q, iolock):
+def process(q, iolock, tfrecord_writer, cat2idx, sess, image, encoded_png):
     while True:
         d = q.get()
         if d is None:
             break
-        product_id = d['_id']
+        # = d['_id']
         category_id = d['category_id']
-        prod_to_category[product_id] = category_id
+        class_id = cat2idx[category_id]
         for e, pic in enumerate(d['imgs']):
             picture = imread(io.BytesIO(pic['picture']))
+            png_string = sess.run(encoded_png, feed_dict={image: picture})
+            height = picture.shape[0]
+            width = picture.shape[1]
+            pdb.set_trace()
+            example = dataset_utils.image_to_tfexample(png_string, b'none', height, width, class_id)
+            tfrecord_writer.write(example.SerializeToString())
             # do something with the picture, etc
 
 def run(dataset_dir):
@@ -55,5 +69,27 @@ def run(dataset_dir):
 
     cat2idx, idx2cat = _make_category_tables(dataset_dir)
 
-
-    pass
+    sys.stdout.write("Converting to tfrecords")
+    sys.stdout.flush()
+    train_splits_fn = sorted(glob.glob(os.path.join(dataset_dir, "split_train/*.bson")))
+    i = 1
+    for train_slit in train_splits_fn:
+        shad = train_slit.split('/')[-1].split('.')[0]
+        output_filename = os.path.join(dataset_dir,"tf_records/train_{}.tfrecord".format(shad))
+        with tf.Graph().as_default():
+            image = tf.placeholder(dtype=tf.uint8, shape=[180, 180, 3])
+            encoded_png = tf.image.encode_png(image)
+            with tf.Session('') as sess:
+                with tf.python_io.TFRecordWriter(output_filename) as tfrecord_writer:
+                    print("Processing {} of {} train splits".format(i, len(train_splits_fn)))
+                    data = bson.decode_file_iter(open(train_slit, 'rb'))
+                    for c, d in enumerate(data):
+                        category_id = d['category_id']
+                        class_id = cat2idx[category_id]
+                        for e, pic in enumerate(d['imgs']):
+                            picture = imread(io.BytesIO(pic['picture']))
+                            png_string = sess.run(encoded_png, feed_dict={image: picture})
+                            height = picture.shape[0]
+                            width = picture.shape[1]
+                            example = dataset_utils.image_to_tfexample(png_string, b'png', height, width, class_id)
+                            tfrecord_writer.write(example.SerializeToString())
