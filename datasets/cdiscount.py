@@ -11,13 +11,15 @@ slim = tf.contrib.slim
 
 _FILE_PATTERNS = {'train': 'cdiscount_train_*.tfrecord', 'validation': 'cdiscount_valid.tfrecord', 'test': 'cdiscount_test.tfrecord'}
 
-SPLITS_TO_SIZES = {'train': 12195682, 'validation': 175611, 'test': 3095080}
+#SPLITS_TO_SIZES = {'train': 12195682, 'validation': 175611, 'test': 3095080}
+SPLITS_TO_SIZES = {'train': 12195682, 'validation': 100000, 'test': 1768182}
 
 _NUM_CLASSES = 5270
 
 _ITEMS_TO_DESCRIPTIONS = {
     'image': 'A [180 x 180 x 3] color image.',
     'label': 'A single integer between 0 and 5269',
+    'product_id': 'A single integer representing the product id'
 }
 
 def get_split(split_name, dataset_dir, file_pattern=None, reader=None):
@@ -54,11 +56,14 @@ def get_split(split_name, dataset_dir, file_pattern=None, reader=None):
       'image/format': tf.FixedLenFeature((), tf.string, default_value='png'),
       'image/class/label': tf.FixedLenFeature(
           [], tf.int64, default_value=tf.zeros([], dtype=tf.int64)),
+      'image/class/product_id': tf.FixedLenFeature(
+          [], tf.int64, default_value=tf.zeros([], dtype=tf.int64)),
   }
 
   items_to_handlers = {
       'image': slim.tfexample_decoder.Image(shape=[180, 180, 3]),
       'label': slim.tfexample_decoder.Tensor('image/class/label'),
+      'product_id': slim.tfexample_decoder.Tensor('image/class/product_id'),
   }
 
   decoder = slim.tfexample_decoder.TFExampleDecoder(

@@ -67,14 +67,24 @@ def float_feature(values):
   return tf.train.Feature(float_list=tf.train.FloatList(value=values))
 
 
-def image_to_tfexample(image_data, image_format, height, width, class_id):
-  return tf.train.Example(features=tf.train.Features(feature={
+def image_to_tfexample(image_data, image_format, height, width, class_id, product_id = None):
+  if product_id:
+    return tf.train.Example(features=tf.train.Features(feature={
+      'image/encoded': bytes_feature(image_data),
+      'image/format': bytes_feature(image_format),
+      'image/class/label': int64_feature(class_id),
+      'image/class/product_id': int64_feature(product_id),
+      'image/height': int64_feature(height),
+      'image/width': int64_feature(width),
+    }))
+  else:
+    return tf.train.Example(features=tf.train.Features(feature={
       'image/encoded': bytes_feature(image_data),
       'image/format': bytes_feature(image_format),
       'image/class/label': int64_feature(class_id),
       'image/height': int64_feature(height),
       'image/width': int64_feature(width),
-  }))
+    }))
 
 
 def download_and_uncompress_tarball(tarball_url, dataset_dir):

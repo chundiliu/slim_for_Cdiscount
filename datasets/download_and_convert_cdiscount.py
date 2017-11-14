@@ -41,11 +41,26 @@ def _make_category_tables(dataset_dir):
         idx2cat[category_idx] = category_id
     return cat2idx, idx2cat
 
-def _convert_dataset(dataset_dir, output_filename, split_name, cat2idx, _image_count, is_testing = False):
+def _convert_dataset_train(dataset_dir, output_filename, split_name, cat2idx, _image_count):
     with tf.python_io.TFRecordWriter(output_filename) as tfrecord_writer:
         print("Processing {}".format(split_name))
         data = bson.decode_file_iter(open(split_name, 'rb'))
         for c, d in enumerate(data):
+            product_id = d['_id']
+            category_id = d['category_id']
+            class_id = cat2idx[category_id]
+            for e, pic in enumerate(d['imgs']):
+                example = dataset_utils.image_to_tfexample(pic['picture'], b'png', _IMAGE_HEIGHT, _IMAGE_WIDTH,
+                                                           class_id, product_id)
+                tfrecord_writer.write(example.SerializeToString())
+                _image_count[0] += 1
+
+def _convert_dataset_eval(dataset_dir, output_filename, split_name, cat2idx, _image_count, is_testing = False):
+    with tf.python_io.TFRecordWriter(output_filename) as tfrecord_writer:
+        print("Processing {}".format(split_name))
+        data = bson.decode_file_iter(open(split_name, 'rb'))
+        for c, d in enumerate(data):
+            product_id = d['_id']
             if is_testing:
                 class_id = -1
             else:
@@ -53,9 +68,10 @@ def _convert_dataset(dataset_dir, output_filename, split_name, cat2idx, _image_c
                 class_id = cat2idx[category_id]
             for e, pic in enumerate(d['imgs']):
                 example = dataset_utils.image_to_tfexample(pic['picture'], b'png', _IMAGE_HEIGHT, _IMAGE_WIDTH,
-                                                           class_id)
+                                                           class_id, product_id)
                 tfrecord_writer.write(example.SerializeToString())
                 _image_count[0] += 1
+                break
 
 def run(dataset_dir):
     """Runs the download and conversion operation.
@@ -76,19 +92,19 @@ def run(dataset_dir):
     for train_split in train_splits_fn:
         shad = train_split.split('/')[-1].split('.')[0]
         output_filename = os.path.join(dataset_dir,"{}/cdiscount_train_{}.tfrecord".format(_TFRECORD_DIC, shad))
-        _convert_dataset(dataset_dir, output_filename, train_split, cat2idx, _image_count)
+        _convert_dataset_train(dataset_dir, output_filename, train_split, cat2idx, _image_count)
     print("{} images in train split are converted into tfrecords file!".format(_image_count[0]))
     #Convert Validation Data
     _image_count = [0]  # Count how many images in this split, use list to do reference pass
     valid_split = os.path.join(dataset_dir, "valid_split.bson")
     output_filename = os.path.join(dataset_dir,"{}/cdiscount_valid.tfrecord".format(_TFRECORD_DIC))
-    _convert_dataset(dataset_dir, output_filename, valid_split, cat2idx, _image_count)
+    _convert_dataset_eval(dataset_dir, output_filename, valid_split, cat2idx, _image_count)
     print("{} images in valid split are converted into tfrecords file!".format(_image_count[0]))
     #Convert Testing Data
     _image_count = [0]  # Count how many images in this split, use list to do reference pass
     test_split = os.path.join(dataset_dir, "test.bson")
     output_filename = os.path.join(dataset_dir, "{}/cdiscount_test.tfrecord".format(_TFRECORD_DIC))
-    _convert_dataset(dataset_dir, output_filename, test_split, cat2idx, _image_count, is_testing = True)
+    _convert_dataset_eval(dataset_dir, output_filename, test_split, cat2idx, _image_count, is_testing = True)
     print("{} images in test split are converted into tfrecords file!".format(_image_count[0]))
 
     print('\nFinished converting the Cdiscount dataset!')
