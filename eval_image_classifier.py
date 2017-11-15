@@ -24,6 +24,7 @@ import tensorflow as tf
 from datasets import dataset_factory
 from nets import nets_factory
 from preprocessing import preprocessing_factory
+import os
 
 slim = tf.contrib.slim
 
@@ -177,8 +178,8 @@ def main(_):
       num_batches = math.ceil(dataset.num_samples / float(FLAGS.batch_size))
 
     if FLAGS.cpu_loop_eval:
+      os.environ['CUDA_VISIBLE_DEVICES'] = ''
       checkpoint_path = FLAGS.checkpoint_path
-      config = tf.ConfigProto(device_count={'GPU': 0})
       slim.evaluation.evaluation_loop(
         master=FLAGS.master,
         checkpoint_dir=checkpoint_path,
@@ -187,8 +188,7 @@ def main(_):
         eval_op=list(names_to_updates.values()),
         variables_to_restore=variables_to_restore,
         summary_op=tf.summary.merge_all(),
-        eval_interval_secs=FLAGS.eval_interval,
-        session_config=config)
+        eval_interval_secs=FLAGS.eval_interval)
     else:
 
       if tf.gfile.IsDirectory(FLAGS.checkpoint_path):
