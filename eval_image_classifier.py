@@ -79,6 +79,12 @@ tf.app.flags.DEFINE_float(
 tf.app.flags.DEFINE_integer(
     'eval_image_size', None, 'Eval image size')
 
+tf.app.flags.DEFINE_boolean('cpu_loop_eval', True,
+                            'If True the evaluation will be done every 2hrs on cpu, '
+                            'otherwise it will run on gpu for just one pass')
+
+tf.app.flags.DEFINE_integer('eval_interval', 7200, 'The frequency with which the model is evaluated, in seconds.')
+
 FLAGS = tf.app.flags.FLAGS
 
 
@@ -126,7 +132,6 @@ def main(_):
     eval_image_size = FLAGS.eval_image_size or network_fn.default_image_size
 
     image = image_preprocessing_fn(image, eval_image_size, eval_image_size)
-
     images, labels = tf.train.batch(
         [image, label],
         batch_size=FLAGS.batch_size,
@@ -171,20 +176,33 @@ def main(_):
       # This ensures that we make a single pass over all of the data.
       num_batches = math.ceil(dataset.num_samples / float(FLAGS.batch_size))
 
-    if tf.gfile.IsDirectory(FLAGS.checkpoint_path):
-      checkpoint_path = tf.train.latest_checkpoint(FLAGS.checkpoint_path)
-    else:
+    if FLAGS.cpu_loop_eval:
       checkpoint_path = FLAGS.checkpoint_path
+      config = tf.ConfigProto(device_count={'GPU': 0})
+      slim.evaluation.evaluation_loop(
+        master=FLAGS.master,
+        checkpoint_dir=checkpoint_path,
+        logdir=FLAGS.eval_dir,
+        num_evals=num_batches,
+        eval_op=list(names_to_updates.values()),
+        variables_to_restore=variables_to_restore,
+        summary_op=tf.summary.merge_all(),
+        eval_interval_secs=FLAGS.eval_interval,
+        session_config=config)
+    else:
 
-    tf.logging.info('Evaluating %s' % checkpoint_path)
-
-    slim.evaluation.evaluate_once(
+      if tf.gfile.IsDirectory(FLAGS.checkpoint_path):
+          checkpoint_path = tf.train.latest_checkpoint(FLAGS.checkpoint_path)
+      else:
+          checkpoint_path = FLAGS.checkpoint_path
+      slim.evaluation.evaluate_once(
         master=FLAGS.master,
         checkpoint_path=checkpoint_path,
         logdir=FLAGS.eval_dir,
         num_evals=num_batches,
         eval_op=list(names_to_updates.values()),
         variables_to_restore=variables_to_restore)
+        
 
 
 if __name__ == '__main__':
