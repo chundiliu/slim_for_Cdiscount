@@ -71,7 +71,6 @@ def _convert_dataset_eval(dataset_dir, output_filename, split_name, cat2idx, _im
                                                            class_id, product_id)
                 tfrecord_writer.write(example.SerializeToString())
                 _image_count[0] += 1
-                break
 
 def run(dataset_dir):
     """Runs the download and conversion operation.
