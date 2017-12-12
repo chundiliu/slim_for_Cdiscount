@@ -11,8 +11,8 @@ slim = tf.contrib.slim
 
 _FILE_PATTERNS = {'train': 'cdiscount_train_*.tfrecord', 'validation': 'cdiscount_valid.tfrecord', 'test': 'cdiscount_test.tfrecord'}
 
-#SPLITS_TO_SIZES = {'train': 12195682, 'validation': 175611, 'test': 3095080}
-SPLITS_TO_SIZES = {'train': 12195682, 'validation': 100000, 'test': 1768182}
+SPLITS_TO_SIZES = {'train': 12195682, 'validation': 175611, 'test': 3095080}
+# SPLITS_TO_SIZES = {'train': 12195682, 'validation': 100000, 'test': 1768182}
 
 _NUM_CLASSES = 5270
 
