@@ -1,6 +1,7 @@
 import math
 import tensorflow as tf
 import os
+import struct
 import pdb
 import numpy as np
 from datasets import dataset_factory
@@ -14,7 +15,7 @@ def merge_predictions(predictions_fn):
     Merge predictions/logit scores for products that are the same.
     '''
 
-    out_f = open(predictions_fn + '_merged', 'w')
+    out_f = open(predictions_fn + '_merged', 'wb')
     f = open(predictions_fn, 'r')
     line = f.readline().strip().split()
     curr_id = line[0]
@@ -32,8 +33,8 @@ def merge_predictions(predictions_fn):
             curr_scores += scores
         else:
             curr_scores = np.cbrt(curr_scores / float(num_elems))
-            curr_scores_str = [str(x) for x in curr_scores]
-            out_f.write(curr_id + ' ' + ' '.join(curr_scores_str) + '\n')
+            for score in curr_scores:
+                out_f.write(struct.pack('>f', score))
 
             curr_scores = scores
             num_elems = 1
@@ -43,8 +44,8 @@ def merge_predictions(predictions_fn):
 
 
     curr_scores = np.cbrt(curr_scores / float(num_elems))
-    curr_scores_str = [str(x) for x in curr_scores]
-    out_f.write(curr_id + ' ' + ' '.join(curr_scores_str) + '\n')
+    for score in curr_scores:
+        out_f.write(struct.pack('>f', score))
 
     out_f.close()
     f.close()
@@ -54,11 +55,10 @@ if __name__ == '__main__':
 
     checkpoint_dir = '/home/shunan/Code/Data/cdiscount/training'
     dataset_dir = '/home/shunan/Code/Data/cdiscount/tf_records'
-    test_fn = '/home/shunan/Code/Data/cdiscount/tf_records/cdiscount_test.tfrecord'
     num_classes = 5270
     image_size = 180
     batch_size = 100
-    set_name = 'test'
+    set_name = 'validation'
     data_sizes = {'train': 12195682, 'validation': 175611, 'test': 3095080}
     out_fn = os.path.join(dataset_dir, '{}_predictions.txt'.format(set_name))
 
@@ -96,9 +96,15 @@ if __name__ == '__main__':
         sess.run(tf.global_variables_initializer())
         saver.restore(sess, checkpoint_file)
         num_iters = int(math.ceil(data_sizes[set_name] / float(batch_size)))
+        num_last_batch = batch_size - ((num_iters * batch_size) - data_sizes[set_name])
 
         for i in range(num_iters):
             output, ids = sess.run([logits, product_ids])
+
+            if i == num_iters - 1:
+                output = output[:num_last_batch, :]
+                ids = ids[:num_last_batch]
+
             for j in range(output.shape[0]):
                 vec_str = [str(x) for x in output[j, :]]
                 output_f.write(str(ids[j]) + ' ' + ' '.join(vec_str) + '\n')
